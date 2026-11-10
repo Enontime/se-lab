@@ -1,0 +1,56 @@
+@startuml
+!theme plain
+skinparam backgroundColor #FFFFFF
+skinparam defaultFontName "Microsoft YaHei"
+skinparam shadowing false
+skinparam roundcorner 12
+skinparam ArrowColor #546B82
+skinparam DefaultTextAlignment center
+skinparam packageBackgroundColor #F7F9FC
+skinparam packageBorderColor #91A5BC
+top to bottom direction
+skinparam nodesep 66
+skinparam ranksep 66
+skinparam state {
+  BackgroundColor #EDF4FD
+  BorderColor #577CA4
+  FontColor #173553
+}
+
+title U4  商品状态图
+
+state "草稿\nDRAFT" as DRAFT
+state "待审核\nPENDING_REVIEW" as PENDING
+state "审核驳回\nREJECTED" as REJECTED
+state "在售\nON_SALE" as ON_SALE
+state "普通下架\nDELISTED" as DELISTED
+state "违规下架\nVIOLATION_DELISTED" as VIOLATION
+state "已售出\nSOLD" as SOLD
+
+' 来源：REQ-003
+[*] --> DRAFT : 创建商品
+' 来源：REQ-003, REQ-004
+DRAFT --> PENDING : 提交审核 [信息完整]
+' 来源：REQ-004
+PENDING --> ON_SALE : 审核通过 / 发布
+' 来源：REQ-004
+PENDING --> REJECTED : 审核驳回
+' 来源：REQ-004
+REJECTED --> PENDING : 修改后重提
+' REQ-005 待确认：修改保存到提交审核之间的状态和其他须重审字段未确定
+' 来源：REQ-005, REQ-014
+ON_SALE --> PENDING : 修改并重审\n[无有效预约]
+' 来源：REQ-006, REQ-015
+ON_SALE --> DELISTED : 卖家下架\n/ 取消有效预约
+' 来源：REQ-006, REQ-015
+ON_SALE --> VIOLATION : 违规下架\n/ 取消有效预约
+' 来源：REQ-011, REQ-015
+ON_SALE --> SOLD : 确认成交\n[预约已确认] / 原子更新
+' 来源：REQ-004, REQ-006
+DELISTED --> PENDING : 卖家重新提交审核
+' 来源：REQ-004, REQ-006
+VIOLATION --> PENDING : 处理后申请重审\n[管理员已处理]
+' 来源：REQ-011
+SOLD --> [*]
+
+@enduml

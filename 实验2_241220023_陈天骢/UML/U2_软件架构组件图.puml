@@ -1,0 +1,81 @@
+@startuml
+!theme plain
+skinparam backgroundColor #FFFFFF
+skinparam defaultFontName "Microsoft YaHei"
+skinparam shadowing false
+skinparam roundcorner 12
+skinparam ArrowColor #546B82
+skinparam DefaultTextAlignment center
+skinparam packageBackgroundColor #F7F9FC
+skinparam packageBorderColor #91A5BC
+top to bottom direction
+skinparam componentStyle rectangle
+skinparam linetype polyline
+skinparam nodesep 55
+skinparam ranksep 58
+skinparam component {
+  BackgroundColor #EDF4FD
+  BorderColor #597DA4
+  FontColor #173553
+}
+
+title U2  软件架构组件图
+
+package "表现层" {
+  component "Web UI\n买家 / 卖家 / 管理员界面" as UI
+}
+package "接口与应用层" {
+  component "API 入口\n会话与请求校验" as API
+  component "应用用例协调器\n跨模块操作及事务边界" as COORD
+}
+package "业务层：六个功能模块" {
+  component "M1 用户与权限\n认证 / 访问控制" as M1
+  component "M2 商品管理\n草稿 / 编辑 / 状态" as M2
+  component "M3 审核与违规\n审核 / 驳回 / 违规处理" as M3
+  component "M4 预约与交易\n预约 / 取消 / 成交" as M4
+  component "M5 查询与统计\n筛选 / 汇总" as M5
+  component "M6 操作日志\n记录 / 管理员查询" as M6
+}
+package "持久化层" {
+  component "数据访问与事务约束" as DAL
+  database "关系型数据库\n用户·商品·预约·审核·日志" as DB
+}
+
+' 来源：REQ-001, REQ-007, REQ-008
+UI -down-> API : 用户请求
+' 来源：REQ-002, REQ-019
+API -down-> COORD : 组织用例
+' 来源：REQ-001, REQ-002, REQ-019
+COORD --> M1 : 认证授权
+' 来源：REQ-003, REQ-005, REQ-006
+COORD --> M2 : 商品与状态
+' 来源：REQ-004, REQ-006
+COORD --> M3 : 审核处理
+' 来源：REQ-008, REQ-011, REQ-012, REQ-013, REQ-014, REQ-020
+COORD --> M4 : 预约与成交
+' 来源：REQ-007, REQ-016, REQ-018
+COORD --> M5 : 查询统计
+' 来源：REQ-017
+COORD --> M6 : 审计日志
+
+' 来源：REQ-004
+M3 ..> M2 : 审核结果
+' 来源：REQ-008, REQ-014, REQ-015
+M4 ..> M2 : 商品状态
+
+' 来源：REQ-001, REQ-015
+M1 --> DAL
+' 来源：REQ-003, REQ-015
+M2 --> DAL
+' 来源：REQ-004, REQ-015
+M3 --> DAL
+' 来源：REQ-008, REQ-015, REQ-020
+M4 --> DAL
+' 来源：REQ-007, REQ-016, REQ-018
+M5 --> DAL
+' 来源：REQ-017
+M6 --> DAL
+' 来源：REQ-015, REQ-020
+DAL -down-> DB : 持久化与事务
+
+@enduml

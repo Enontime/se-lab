@@ -1,0 +1,103 @@
+@startuml
+!theme plain
+skinparam backgroundColor #FFFFFF
+skinparam defaultFontName "Microsoft YaHei"
+skinparam shadowing false
+skinparam roundcorner 12
+skinparam ArrowColor #546B82
+skinparam DefaultTextAlignment center
+skinparam packageBackgroundColor #F7F9FC
+skinparam packageBorderColor #91A5BC
+left to right direction
+skinparam usecase {
+  BackgroundColor #EDF4FD
+  BorderColor #577CA4
+  FontColor #173553
+}
+skinparam actorStyle awesome
+skinparam nodesep 18
+skinparam ranksep 24
+
+title U1  系统用例图
+
+actor "普通用户" as Normal
+actor "买家角色" as Buyer
+actor "卖家角色" as Seller
+actor "管理员" as Admin
+
+rectangle "校园二手物品交易系统" {
+  package "账户" as PAccount {
+    usecase "普通账号注册 / 登录" as UCLogin
+    usecase "管理员登录" as UCAlogin
+  }
+  package "商品与查询" as PProduct {
+    usecase "查询及查看商品" as UCSearch
+    usecase "创建 / 编辑商品草稿" as UCDraft
+    usecase "提交审核 / 查看结果" as UCSubmit
+    usecase "主动下架商品" as UCDelist
+    usecase "审核通过 / 驳回" as UCReview
+    usecase "违规下架" as UCViolation
+  }
+  package "预约与交易" as PBooking {
+    usecase "发起预约" as UCCreate
+    usecase "查看 / 取消预约" as UCCancel
+    usecase "确认 / 拒绝预约" as UCHandle
+    usecase "确认线下成交" as UCComplete
+    usecase "查看交易历史" as UCHistory
+  }
+  package "统计与审计" as PStats {
+    usecase "查看本人统计" as UCOwnerStats
+    usecase "查看平台统计" as UCAdminStats
+    usecase "查询操作日志" as UCLogs
+  }
+}
+
+
+PAccount -[hidden]right-> PProduct
+PAccount -[hidden]down-> PBooking
+PProduct -[hidden]down-> PStats
+PBooking -[hidden]right-> PStats
+
+' 来源：REQ-002
+Buyer --|> Normal
+' 来源：REQ-002
+Seller --|> Normal
+' 来源：REQ-001, REQ-002
+Normal -- UCLogin
+
+' 来源：REQ-002, REQ-007
+Buyer -- UCSearch
+' 来源：REQ-002, REQ-008
+Buyer -- UCCreate
+' 来源：REQ-002, REQ-010
+Buyer -- UCCancel
+' 来源：REQ-011
+Buyer -- UCHistory
+
+' 来源：REQ-003
+Seller -- UCDraft
+' 来源：REQ-004, REQ-005
+Seller -- UCSubmit
+' 来源：REQ-006
+Seller -- UCDelist
+' 来源：REQ-009
+Seller -- UCHandle
+' 来源：REQ-011
+Seller -- UCComplete
+' 来源：REQ-011
+Seller -- UCHistory
+' 来源：REQ-016
+Seller -- UCOwnerStats
+
+' 来源：REQ-001
+UCAlogin -- Admin
+' 来源：REQ-004
+UCReview -- Admin
+' 来源：REQ-006
+UCViolation -- Admin
+' 来源：REQ-016
+UCAdminStats -- Admin
+' 来源：REQ-017
+UCLogs -- Admin
+
+@enduml

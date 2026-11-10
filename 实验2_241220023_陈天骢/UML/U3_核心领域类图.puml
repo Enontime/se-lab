@@ -1,0 +1,133 @@
+@startuml
+!theme plain
+skinparam backgroundColor #FFFFFF
+skinparam defaultFontName "Microsoft YaHei"
+skinparam shadowing false
+skinparam roundcorner 12
+skinparam ArrowColor #546B82
+skinparam DefaultTextAlignment center
+skinparam packageBackgroundColor #F7F9FC
+skinparam packageBorderColor #91A5BC
+left to right direction
+skinparam linetype polyline
+skinparam nodesep 65
+skinparam ranksep 78
+skinparam class {
+  BackgroundColor #F1F6FD
+  BorderColor #577CA4
+  ArrowColor #546B82
+  AttributeIconSize 0
+}
+hide empty methods
+
+title U3  核心领域类图
+
+package "核心持久化实体" {
+  class User {
+    +id: UUID
+    +username: String
+    -passwordHash: String
+    +accountType: AccountType
+    +createdAt: DateTime
+  }
+  class Product {
+    +id: UUID
+    +sellerId: UUID
+    +title: String
+    +category: String
+    +price: Decimal
+    +condition: String
+    +description: String
+    +tradeLocation: String
+    +status: ProductStatus
+    +version: Long
+    +publishedAt: DateTime?
+    +violationReason: String?
+    --
+    +isOnSale(): Boolean
+    +canSubmitReview(): Boolean
+  }
+  class Reservation {
+    +id: UUID
+    +buyerId: UUID
+    +productId: UUID
+    +requestId: String
+    ' 设计推导（REQ-013）：检测同键重复请求的参数是否一致
+    +requestFingerprint: String
+    +status: ReservationStatus
+    +createdAt: DateTime
+    +confirmedAt: DateTime?
+    +cancelledAt: DateTime?
+    +completedAt: DateTime?
+    +cancelSource: CancelSource?
+    +cancelReason: String?
+    --
+    +isActive(): Boolean
+    +canCancel(): Boolean
+  }
+  class ProductReview {
+    +id: UUID
+    +productId: UUID
+    +adminId: UUID
+    +decision: ReviewDecision
+    +reason: String?
+    +reviewedAt: DateTime
+  }
+  class OperationLog {
+    +id: UUID
+    +actorId: UUID
+    +action: String
+    +targetType: String
+    +targetId: UUID
+    +result: String
+    +reason: String?
+    +createdAt: DateTime
+  }
+}
+
+package "业务枚举" {
+  enum AccountType {
+    NORMAL
+    ADMIN
+  }
+  enum ProductStatus {
+    DRAFT
+    PENDING_REVIEW
+    REJECTED
+    ON_SALE
+    DELISTED
+    VIOLATION_DELISTED
+    SOLD
+  }
+  enum ReservationStatus {
+    PENDING
+    CONFIRMED
+    CANCELLED
+    COMPLETED
+  }
+  enum ReviewDecision {
+    APPROVED
+    REJECTED
+  }
+  enum CancelSource {
+    BUYER
+    SELLER_REJECTED
+    PRODUCT_DELISTED
+    VIOLATION_DELISTED
+  }
+}
+
+' 来源：REQ-003, REQ-015
+User "1" -right- "0..*" Product : 发布
+' 来源：REQ-008, REQ-015
+Product "1" -right- "0..*" Reservation : 历史预约
+' 来源：REQ-004, REQ-015
+Product "1" -up- "0..*" ProductReview : 审核记录
+' 来源：REQ-002, REQ-008, REQ-015
+User "1" -- "0..*" Reservation : 申请
+' 来源：REQ-002, REQ-004
+User "1" -- "0..*" ProductReview : 审核
+' 来源：REQ-017
+User "1" -- "0..*" OperationLog : 操作记录
+
+@enduml

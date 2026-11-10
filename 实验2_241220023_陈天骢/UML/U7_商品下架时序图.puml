@@ -1,0 +1,89 @@
+@startuml
+!theme plain
+skinparam backgroundColor #FFFFFF
+skinparam defaultFontName "Noto Sans CJK SC"
+skinparam shadowing false
+skinparam roundcorner 10
+skinparam dpi 150
+skinparam ArrowColor #546B82
+skinparam DefaultTextAlignment center
+skinparam packageBackgroundColor #F7F9FC
+skinparam packageBorderColor #91A5BC
+skinparam sequence {
+  ArrowColor #546B82
+  LifeLineBorderColor #86A1BB
+  ParticipantBackgroundColor #EDF4FD
+  ParticipantBorderColor #597DA4
+  GroupBackgroundColor #F7F9FC
+  GroupBorderColor #91A5BC
+}
+
+title U7  商品下架时序图
+
+actor "卖家 / 管理员" as User
+boundary "商品管理 / 审核界面" as UI
+control "应用用例协调器" as Coord
+control "M2 商品管理" as Product
+control "M3 审核与违规" as Review
+control "M4 预约与交易" as Booking
+control "M6 操作日志" as Audit
+database "业务数据库" as DB
+
+' 来源：REQ-006
+User -> UI : 发起主动下架 / 违规下架
+' 来源：REQ-006
+UI -> Coord : delist(productId, type, reason)
+' 来源：REQ-002, REQ-019
+Coord -> Coord : 校验登录状态、下架类型与权限\n违规下架需管理员权限及有效原因
+alt 未登录 / 类型非法 / 无操作权限 / 违规原因缺失
+' 来源：REQ-002, REQ-019
+  Coord --> UI : 拒绝下架
+else 身份与操作类型校验通过
+' 来源：REQ-006, REQ-015
+  Coord -> DB : BEGIN
+' 来源：REQ-002, REQ-006
+  Coord -> Product : 锁定并检查商品状态、卖家归属
+' 来源：REQ-006
+  ' 下架与创建预约须按同一商品行锁顺序串行化，避免 TOCTOU。
+  Product -> DB : SELECT 商品状态与 sellerId\nFOR UPDATE（锁定商品行）
+' 来源：REQ-006
+  DB --> Product : 商品状态和卖家信息
+  alt 商品非在售 / (主动下架且非商品卖家)
+' 来源：REQ-002, REQ-006
+    Product --> Coord : 状态无效 / 卖家无权主动下架
+' 来源：REQ-006, REQ-015
+    Coord -> DB : ROLLBACK
+' 来源：REQ-002, REQ-006
+    Coord --> UI : 拒绝，状态不变
+  else 允许下架
+    alt 管理员违规下架
+' 来源：REQ-006
+      Coord -> Review : 核对违规处理理由
+' 来源：REQ-006
+      Review --> Coord : 已核对
+' 来源：REQ-006
+      Coord -> Product : 标记违规下架
+    else 卖家主动下架
+' 来源：REQ-006
+      Coord -> Product : 标记主动下架
+    end
+' 来源：REQ-006, REQ-015
+    Product -> DB : 保存下架状态与原因
+' 来源：REQ-006, REQ-010, REQ-015
+    Coord -> Booking : 取消有效预约\n(记录来源和原因)
+' 来源：REQ-006, REQ-015
+    Booking -> DB : 有效预约改为 CANCELLED
+' 来源：REQ-017
+    Coord -> Audit : 记录操作人、对象与结果
+' 来源：REQ-017
+    Audit -> DB : 写入日志
+' 来源：REQ-006, REQ-015
+    Coord -> DB : COMMIT
+' 来源：REQ-006
+    Coord --> UI : 下架成功 / 原因可查询
+  end
+end
+' 来源：REQ-006
+UI --> User : 展示处理结果
+
+@enduml
