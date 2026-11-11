@@ -1,0 +1,110 @@
+@startuml
+!theme plain
+skinparam backgroundColor #FFFFFF
+skinparam defaultFontName "Microsoft YaHei"
+skinparam shadowing false
+skinparam roundcorner 12
+skinparam ArrowColor #546B82
+skinparam DefaultTextAlignment center
+skinparam packageBackgroundColor #F7F9FC
+skinparam packageBorderColor #91A5BC
+skinparam sequence {
+  ArrowColor #546B82
+  LifeLineBorderColor #86A1BB
+  ParticipantBackgroundColor #EDF4FD
+  ParticipantBorderColor #597DA4
+  ActorBorderColor #597DA4
+  GroupBackgroundColor #F7F9FC
+  GroupBorderColor #91A5BC
+}
+
+title U6  预约申请时序图
+
+actor "买家" as Buyer
+boundary "商品详情页" as UI
+control "API / 应用协调" as API
+control "M1 用户与权限" as Auth
+control "M4 预约与交易" as Booking
+control "M2 商品管理" as Product
+control "M6 操作日志" as Audit
+database "业务数据库" as DB
+
+' 来源：REQ-008
+Buyer -> UI : 点击预约
+' 来源：REQ-008, REQ-013, REQ-014
+UI -> API : 提交预约(商品, 请求ID,\n页面价格与版本)
+' 来源：REQ-001, REQ-019
+API -> Auth : 检查登录身份
+alt 未登录
+' 来源：REQ-001, REQ-019
+  Auth --> API : 无有效身份
+' 来源：REQ-001
+  API --> UI : 提示登录
+else 已登录
+' 来源：REQ-001, REQ-002
+  Auth --> API : buyerId
+' 来源：REQ-008, REQ-013
+  API -> Booking : 创建预约(买家, 商品, 请求信息)
+' 来源：REQ-013
+  Booking -> DB : 按请求键查历史记录
+  alt 请求键已存在
+' 来源：REQ-013
+    DB --> Booking : 历史预约及参数指纹
+' 来源：REQ-013
+    Booking --> API : 返回原结果 / 拒绝键复用
+  else 新请求
+' 来源：REQ-008, REQ-012
+    Booking -> DB : BEGIN
+' 来源：REQ-014, REQ-015
+    Booking -> Product : 锁定并查询商品(同一事务)
+' 来源：REQ-012, REQ-014, REQ-015, REQ-020
+    Product -> DB : SELECT 商品状态、价格、版本、sellerId\nFOR UPDATE（锁定商品行）
+' 来源：REQ-014, REQ-015
+    DB --> Product : 已锁定的当前商品信息
+' 来源：REQ-014
+    Product --> Booking : 返回商品信息
+    alt 非在售 / 本人商品 / 页面过期
+' 来源：REQ-002, REQ-008, REQ-014
+      Booking -> DB : ROLLBACK
+' 来源：REQ-002, REQ-014
+      Booking --> API : 拒绝 / 提示刷新
+    else 当前商品信息合法
+' 来源：REQ-008, REQ-012, REQ-015, REQ-020
+      Booking -> DB : 原子插入 PENDING 预约
+      alt 插入成功
+' 来源：REQ-017
+        Booking -> Audit : 记录预约成功（买家、商品、预约、结果）
+' 来源：REQ-017
+        Audit -> DB : 同一事务内写入操作日志
+        alt 日志写入成功
+          DB --> Audit : 写入成功
+          Audit --> Booking : 记录完成
+' 来源：REQ-008, REQ-012, REQ-015, REQ-017
+          Booking -> DB : COMMIT（释放商品行锁）
+' 来源：REQ-008
+          Booking --> API : 返回新预约
+        else 日志写入失败
+          DB --> Audit : 写入失败
+          Audit --> Booking : 记录失败
+' 来源：REQ-015, REQ-017
+          Booking -> DB : ROLLBACK（撤销预约，释放锁）
+          Booking --> API : 创建失败，预约未生效
+        end
+      else 唯一性冲突
+' 来源：REQ-013, REQ-020
+        Booking -> DB : ROLLBACK
+' 来源：REQ-013, REQ-012
+        Booking -> DB : 回滚后重查请求键与占用
+' 来源：REQ-012, REQ-013
+        DB --> Booking : 冲突分类结果
+' 来源：REQ-012, REQ-013
+        Booking --> API : 按重查结果返回\n原预约 / 已占用 / 键冲突
+      end
+    end
+  end
+' 来源：REQ-008, REQ-014
+  API --> UI : 返回预约结果 / 错误
+end
+' 来源：REQ-008, REQ-014
+UI --> Buyer : 展示结果或刷新提示
+@enduml

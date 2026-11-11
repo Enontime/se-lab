@@ -1,0 +1,42 @@
+@startuml
+!theme plain
+skinparam backgroundColor #FFFFFF
+skinparam defaultFontName "Microsoft YaHei"
+skinparam shadowing false
+skinparam roundcorner 12
+skinparam ArrowColor #546B82
+skinparam DefaultTextAlignment center
+skinparam packageBackgroundColor #F7F9FC
+skinparam packageBorderColor #91A5BC
+left to right direction
+skinparam nodesep 68
+skinparam ranksep 64
+skinparam state {
+  BackgroundColor #EDF4FD
+  BorderColor #577CA4
+  FontColor #173553
+}
+
+title U5  预约状态图
+
+state "待确认\nPENDING" as PENDING
+state "已确认\nCONFIRMED" as CONFIRMED
+state "已取消\nCANCELLED" as CANCELLED
+state "已完成\nCOMPLETED" as COMPLETED
+
+' 来源：REQ-008, REQ-012
+[*] --> PENDING : 买家成功预约\n[商品在售且无有效预约]
+' 来源：REQ-009
+PENDING --> CONFIRMED : 卖家确认
+' 来源：REQ-009, REQ-010, REQ-006
+PENDING --> CANCELLED : 买家取消 / 卖家拒绝 / 下架
+' 来源：REQ-010, REQ-006
+CONFIRMED --> CANCELLED : 买家取消 / 商品下架
+' 来源：REQ-011, REQ-015
+CONFIRMED --> COMPLETED : 确认成交\n[商品仍在售] / 同步售出
+' 来源：REQ-010
+CANCELLED --> [*]
+' 来源：REQ-011
+COMPLETED --> [*]
+
+@enduml

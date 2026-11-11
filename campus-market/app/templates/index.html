@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <meta name="description" content="校园拾集——校内二手物品发布、审核和预约平台">
+  <title>校园拾集 · 校园二手物品交易</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/site.css') }}">
+  <script defer src="{{ url_for('static', filename='js/site.js') }}"></script>
+</head>
+<body>
+  <header class="topbar">
+    <div class="topbar-inner">
+      <a class="brand" href="#/browse" aria-label="校园拾集首页">
+        <span class="brand-mark"><span class="brand-mark-glyph" aria-hidden="true">拾</span></span><span>校园拾集<small>CAMPUS MARKET</small></span>
+      </a>
+      <nav id="top-nav" class="top-nav" aria-label="主导航"></nav>
+      <div class="account" id="account-bar"></div>
+    </div>
+  </header>
+  <main id="view" class="main" tabindex="-1" aria-live="polite">
+    <div class="loading">正在载入校园拾集…</div>
+  </main>
+  <footer class="footer">校园拾集 · 校园二手交易原型 · 线下交易 · 不含支付、物流及即时聊天</footer>
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+</body>
+</html>
