@@ -204,10 +204,10 @@
       throw new Error("服务器响应格式错误（商品列表结构不正确），请重试");
     const categories = facets.categories.map(c => [c.category, `${c.category} (${c.total})`]);
     if (!currentView(ctx) || !["/browse", "/"].includes(pathname())) return;
-    view(`<section class="hero"><div><div class="eyebrow">CAMPUS SECOND-HAND MARKET</div><h1>让闲置在校园里流转</h1>
-      <p>发布方便 · 审核透明 · 线下交易更安心</p><div class="button-row"><a href="#/browse" class="button">浏览商品</a>
+    view(`${titleBar("校园二手集市", "发现同校同学发布的闲置")}<section class="hero"><div><div class="eyebrow">CAMPUS SECOND-HAND MARKET</div><h1>让闲置在校园里流转</h1>
+      <p>发布闲置 · 预约好物 · 当面交易</p><div class="button-row"><a href="#/browse" class="button">浏览商品</a>
       <a href="#/publish" class="button secondary">发布闲置</a></div></div><div class="hero-visual">拾</div></section>
-      <div class="section-head section"><div><h2>在售好物</h2><p class="sub">${facets.total_on_sale || 0} 件商品在售，${facets.available || 0} 件可预约</p></div></div>
+      <div class="section-head section"><div><h2>在售好物</h2><p class="sub">按分类、价格和状态，筛选同校好物</p><p class="sub">${facets.total_on_sale || 0} 件商品在售，${facets.available || 0} 件可预约</p></div></div>
       <div class="catalog-layout"><aside class="panel catalog-sidebar"><h3>商品筛选</h3>
       <form data-form="catalog"><div class="field"><label for="q-keyword">关键词</label><input id="q-keyword" name="keyword" maxlength="100" value="${e(state.catalog.keyword)}" placeholder="搜索教材、数码…"></div>
       <div class="field"><label for="q-category">商品分类</label><select id="q-category" name="category">${options(categories, state.catalog.category, "全部分类")}</select></div>
