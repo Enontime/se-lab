@@ -44,7 +44,7 @@ node --check .\app\static\js\site.js
 node .\qa_tests\frontend_vm_v042.cjs
 ```
 
-Node.js 仅用于可选的前端专项测试，网页正常使用不依赖 Node.js。严格非 GUI Python 代码行数由脚本报告，排除了测试、GUI、注释和 docstring；最终打包前为 1690 行（请以再次运行的输出为准）。
+Node.js 仅用于可选的前端专项测试，网页正常使用不依赖 Node.js。严格非 GUI Python 代码行数由脚本报告，排除了测试、GUI、注释和 docstring；最终打包前为 1693 行。
 
 ## 代码结构
 
@@ -61,7 +61,3 @@ Node.js 仅用于可选的前端专项测试，网页正常使用不依赖 Node.
 ## 与实验二设计的关系
 
 实验二提交的 U1～U7 原图保存在历史 Git 提交中。实验三根据确认后的 REQ-005 更新了 **提交副本中的 U4**：在售商品的六字段实际修改先转 `DRAFT`，卖家另行提交审核进入 `PENDING_REVIEW`。更新后的 `.puml` 是权威可编辑源，`.png` 为同等状态和连线语义的本地 Graphviz 排版图。其他 U1～U3/U5～U7 直接继承实验二原版。
-
-## 提交说明
-
-课程 ZIP 另有 `UML/` 和由学生本人独立撰写的 `实验报告.pdf`。本目录仅存源码、运行依赖、测试和必要的实现说明，不包含 Git 历史、虚拟环境、QA 截图/trace、SQLite 测试数据库等中间文件。

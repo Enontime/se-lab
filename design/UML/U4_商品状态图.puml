@@ -37,9 +37,9 @@ PENDING --> ON_SALE : 审核通过 / 发布
 PENDING --> REJECTED : 审核驳回
 ' 来源：REQ-004
 REJECTED --> PENDING : 修改后重提
-' REQ-005 待确认：修改保存到提交审核之间的状态和其他须重审字段未确定
+' REQ-005 V1.2：六字段的任意实际修改都会先将商品撤回草稿
 ' 来源：REQ-005, REQ-014
-ON_SALE --> PENDING : 修改并重审\n[无有效预约]
+ON_SALE --> DRAFT : 保存商品修改\n[无有效预约]
 ' 来源：REQ-006, REQ-015
 ON_SALE --> DELISTED : 卖家下架\n/ 取消有效预约
 ' 来源：REQ-006, REQ-015
