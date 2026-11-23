@@ -1,14 +1,17 @@
 """Flask application factory. Pure business services work without Flask installed."""
 from __future__ import annotations
 
-import os
 from pathlib import Path
+
+from app.services.market import Market
 
 
 def create_app(test_config: dict | None = None):
+    # Load the HTTP stack only when building a Flask application.
+    """Build the Flask app, initialize its configured database, and register routes."""
     from flask import Flask, render_template
+
     from app.api.routes import register_routes
-    from app.services.market import Market
 
     app = Flask(__name__)
     instance = Path(app.instance_path)

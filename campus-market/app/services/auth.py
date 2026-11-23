@@ -8,13 +8,13 @@ import sqlite3
 from datetime import datetime, timedelta, timezone
 
 from app.core.errors import BusinessError, require
-from app.core.validation import now, normalized_username, string
-from app.services.audit import log_success
+from app.core.validation import normalized_username, now, string
 
 HASH_ITERATIONS = 600_000
 
 
 def hash_password(password: str) -> str:
+    """Validate a password and encode a salted PBKDF2-SHA256 digest for storage."""
     require(isinstance(password, str) and 8 <= len(password) <= 128,
             "INVALID_PASSWORD", "密码长度需要为 8～128 字符")
     salt = secrets.token_bytes(16)
@@ -23,6 +23,7 @@ def hash_password(password: str) -> str:
 
 
 def verify_password(password: str, stored: str) -> bool:
+    """Compare the supplied password against a stored PBKDF2-SHA256 digest."""
     if not isinstance(password, str):
         return False
     try:
@@ -37,6 +38,7 @@ def verify_password(password: str, stored: str) -> bool:
 
 
 def create_user(conn, username: str, password: str, *, admin: bool = False) -> dict:
+    """Insert a normal or admin account in the caller's transaction and return its identity."""
     username = string(username, "username", limit=32)
     key = normalized_username(username)
     encoded = hash_password(password)
@@ -53,21 +55,27 @@ def create_user(conn, username: str, password: str, *, admin: bool = False) -> d
 
 
 def get_actor(conn, user_id: int) -> dict:
-    row = conn.execute("SELECT id,username,account_type FROM users WHERE id=?", (user_id,)).fetchone()
+    """Return public account fields for a user ID or raise UNAUTHORIZED."""
+    row = conn.execute(
+        "SELECT id,username,account_type FROM users WHERE id=?", (user_id,)
+    ).fetchone()
     if row is None:
         raise BusinessError("UNAUTHORIZED", "请先登录", 401)
     return dict(row)
 
 
 def require_normal(actor: dict) -> None:
+    """Reject an actor without the normal-user role with FORBIDDEN."""
     require(actor["account_type"] == "NORMAL", "FORBIDDEN", "普通用户专属操作", 403)
 
 
 def require_admin(actor: dict) -> None:
+    """Reject an actor without the administrator role with FORBIDDEN."""
     require(actor["account_type"] == "ADMIN", "FORBIDDEN", "管理员专属操作", 403)
 
 
 def issue_token(conn, username: str, password: str) -> tuple[str, dict]:
+    """Verify credentials and store a seven-day session in the caller's transaction."""
     username = string(username, "username", limit=32)
     key = normalized_username(username)
     row = conn.execute("SELECT * FROM users WHERE username_key=?", (key,)).fetchone()
@@ -85,6 +93,7 @@ def issue_token(conn, username: str, password: str) -> tuple[str, dict]:
 
 
 def resolve_token(conn, raw_token: str) -> dict:
+    """Return the actor for a live bearer session or raise UNAUTHORIZED."""
     if not raw_token:
         raise BusinessError("UNAUTHORIZED", "需要 Bearer Token", 401)
     token_hash = hashlib.sha256(raw_token.encode("utf-8")).hexdigest()
@@ -100,5 +109,6 @@ def resolve_token(conn, raw_token: str) -> dict:
 
 
 def revoke_token(conn, raw_token: str) -> None:
+    """Delete the session for a bearer token on the caller's write connection."""
     token_hash = hashlib.sha256(raw_token.encode("utf-8")).hexdigest()
     conn.execute("DELETE FROM auth_sessions WHERE token_hash=?", (token_hash,))

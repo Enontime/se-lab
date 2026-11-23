@@ -1,7 +1,7 @@
 """M2: product state transitions and ownership rules."""
 from __future__ import annotations
 
-from app.core.errors import BusinessError, require
+from app.core.errors import require
 from app.core.state_rules import check_product_edge
 from app.core.validation import detail_from_row, now, price, string
 from app.services.audit import log_success
@@ -12,11 +12,13 @@ REQUIRED = ("title", "category", "price_cents", "item_condition", "description",
 
 
 def product_row(conn, product_id: int) -> dict:
+    """Fetch a product by ID, raising NOT_FOUND if absent; callers enforce visibility."""
     row = conn.execute("SELECT * FROM products WHERE id=?", (product_id,)).fetchone()
     return detail_from_row(row)
 
 
 def own_product(conn, product_id: int, actor: dict) -> dict:
+    """Fetch a product for its normal-user owner or raise FORBIDDEN."""
     require_normal(actor)
     p = product_row(conn, product_id)
     require(p["seller_id"] == actor["id"], "FORBIDDEN", "不能修改其他人的商品", 403)
@@ -24,12 +26,14 @@ def own_product(conn, product_id: int, actor: dict) -> dict:
 
 
 def active_booking(conn, product_id: int) -> bool:
+    """Report whether a product has a pending or confirmed reservation."""
     return conn.execute("""SELECT EXISTS(
         SELECT 1 FROM reservations WHERE product_id=? AND status IN ('PENDING','CONFIRMED')
     )""", (product_id,)).fetchone()[0] == 1
 
 
 def normalize_changes(data: dict) -> dict:
+    """Validate editable fields and normalize prices and text before persistence."""
     require(isinstance(data, dict), "INVALID_INPUT", "商品信息必须为对象")
     require(bool(data) and set(data).issubset(EDITABLE),
             "INVALID_INPUT", "商品字段为空或包含未知字段")
@@ -38,6 +42,7 @@ def normalize_changes(data: dict) -> dict:
 
 
 def create_draft(conn, actor: dict, fields: dict) -> dict:
+    """Insert and audit a normal seller's draft in the caller's transaction."""
     require_normal(actor)
     data = normalize_changes(fields)
     timestamp = now()
@@ -51,10 +56,13 @@ def create_draft(conn, actor: dict, fields: dict) -> dict:
     return product_row(conn, cur.lastrowid)
 
 
-EDITABLE_ORDER = ("title", "category", "price_cents", "item_condition", "description", "trade_location")
+EDITABLE_ORDER = (
+    "title", "category", "price_cents", "item_condition", "description", "trade_location",
+)
 
 
 def edit_draft(conn, actor: dict, product_id: int, changes: dict) -> dict:
+    """Update and audit an owned draft or rejected listing on the caller's transaction."""
     p = own_product(conn, product_id, actor)
     require(p["status"] in {"DRAFT", "REJECTED"},
             "INVALID_STATUS", "只有草稿或审核驳回的商品可直接编辑", 409)
@@ -67,13 +75,19 @@ def edit_draft(conn, actor: dict, product_id: int, changes: dict) -> dict:
 
 
 def submit_review(conn, actor: dict, product_id: int) -> dict:
+    """Move an owned, complete listing to pending review on the caller's transaction.
+
+    A violation-delisted listing requires a resolved case before submission.
+    """
     p = own_product(conn, product_id, actor)
     require(p["status"] in {"DRAFT", "REJECTED", "DELISTED", "VIOLATION_DELISTED"},
             "INVALID_STATUS", "此商品不能直接提交审核", 409)
     if p["status"] == "VIOLATION_DELISTED":
         # U4: administrator resolves the incident first; seller then requests
         # a normal review, with no automatic publication or approval.
+        # Import lazily because violation handling also reads product rows.
         from app.services.violations import ready_for_resubmit
+
         ready_for_resubmit(conn, product_id)
     for field in REQUIRED:
         require(p[field] is not None and (field == "price_cents" or bool(p[field])),

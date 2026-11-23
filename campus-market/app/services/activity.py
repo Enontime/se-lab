@@ -5,6 +5,7 @@ Market's original transactions; no independent audit write transaction exists.
 """
 from __future__ import annotations
 
+from app.core.errors import require
 from app.core.filters import date_range
 from app.core.validation import integer
 from app.db.read_models import page_bounds
@@ -68,7 +69,6 @@ def user_activity(conn, actor: dict, user_id: int, *,
     limit, offset = page_bounds(limit, offset)
     user = conn.execute("SELECT id,username,account_type FROM users WHERE id=?",
                         (user_id,)).fetchone()
-    from app.core.errors import require
     require(user is not None, "NOT_FOUND", "用户不存在", 404)
     events = [dict(row) for row in conn.execute("""SELECT * FROM operation_logs
         WHERE actor_id=? ORDER BY id DESC LIMIT ? OFFSET ?""",

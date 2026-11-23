@@ -7,14 +7,14 @@ from __future__ import annotations
 
 import sqlite3
 from concurrent.futures import ThreadPoolExecutor
-from threading import Barrier
 from datetime import datetime, timedelta, timezone
+from threading import Barrier
 
 import pytest
 
 from app.core.errors import BusinessError
 from app.db.connection import read_connection, write_transaction
-from app.services import auth, audit
+from app.services import audit, auth
 from app.services.market import Market
 
 

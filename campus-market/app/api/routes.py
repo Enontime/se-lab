@@ -7,23 +7,28 @@ from functools import wraps
 from flask import Blueprint, current_app, g, jsonify, request
 
 from app.core.errors import BusinessError, require
+from app.core.filters import guard_fields
+from app.core.state_rules import state_catalog
 from app.core.validation import integer
-from app.core.filters import guard_fields, integer_query
+from app.services.auth import require_admin
 
 api = Blueprint("api", __name__, url_prefix="/api")
 
 
 def market():
+    """Return the Market coordinator configured for the current Flask app."""
     return current_app.extensions["campus_market_service"]
 
 
 def body() -> dict:
+    """Read a JSON object from the request or raise INVALID_JSON."""
     result = request.get_json(silent=True)
     require(isinstance(result, dict), "INVALID_JSON", "请求体必须是 JSON 对象")
     return result
 
 
 def token() -> str:
+    """Extract the bearer credential or reject a missing or malformed header."""
     header = request.headers.get("Authorization", "")
     require(header.startswith("Bearer ") and len(header) > 7,
             "UNAUTHORIZED", "需要 Authorization: Bearer <token>", 401)
@@ -31,14 +36,17 @@ def token() -> str:
 
 
 def login_required(fn):
+    """Resolve the bearer session and bind its actor to the Flask request."""
     @wraps(fn)
     def decorated(*args, **kwargs):
+        """Authenticate this request before calling the protected endpoint."""
         g.actor = market().identity(token())
         return fn(*args, **kwargs)
     return decorated
 
 
 def bounded_int_arg(name: str, default: int | None = None, minimum: int = 0) -> int | None:
+    """Parse a query integer and enforce its minimum, defaulting only if absent."""
     raw = request.args.get(name)
     if raw is None:
         return default
@@ -51,23 +59,26 @@ def bounded_int_arg(name: str, default: int | None = None, minimum: int = 0) -> 
 
 @api.get("/meta/state-transitions")
 def state_transitions():
-    from app.core.state_rules import state_catalog
+    """Expose the server's product and reservation transition catalog."""
     return state_catalog()
 
 
 @api.get("/health")
 def health():
+    """Return the HTTP adapter's liveness status."""
     return {"status": "ok"}
 
 
 @api.post("/auth/register")
 def register():
+    """Create a normal account from the JSON credentials and return HTTP 201."""
     data = body()
     return jsonify(market().create_account(data.get("username"), data.get("password"))), 201
 
 
 @api.post("/auth/login")
 def login():
+    """Exchange JSON credentials for a bearer token and public account details."""
     data = body()
     return market().login(data.get("username"), data.get("password"))
 
@@ -75,17 +86,20 @@ def login():
 @api.post("/auth/logout")
 @login_required
 def logout():
+    """Revoke the authenticated request's bearer token."""
     return market().logout(token())
 
 
 @api.get("/auth/me")
 @login_required
 def me():
+    """Return the account resolved for the authenticated request."""
     return g.actor
 
 
 @api.get("/products")
 def public_products():
+    """List public products using the requested filters and pagination."""
     return {"items": market().list_public(
         keyword=request.args.get("keyword"),
         category=request.args.get("category"),
@@ -100,22 +114,26 @@ def public_products():
 
 @api.get("/products/facets")
 def product_facets():
+    """Return public category, price, and availability summaries."""
     return market().public_facets()
 
 
 @api.get("/products/count")
 def product_count():
+    """Count public products for the optional availability filter."""
     return market().public_count(availability=request.args.get("availability"))
 
 
 @api.get("/products/<int:product_id>")
 def product_detail(product_id: int):
+    """Return a public listing or raise NOT_FOUND for a hidden or missing product."""
     return market().public_detail(product_id)
 
 
 @api.get("/my/products")
 @login_required
 def my_products():
+    """List the current seller's products with status filtering and pagination."""
     return {"items": market().my_products(
         g.actor, status=request.args.get("status"),
         limit=bounded_int_arg("limit", 50, 1),
@@ -125,54 +143,63 @@ def my_products():
 @api.get("/my/products/<int:product_id>")
 @login_required
 def my_product_detail(product_id):
+    """Return a product owned by the current seller, including private states."""
     return market().my_product_detail(g.actor, product_id)
 
 
 @api.get("/my/dashboard")
 @login_required
 def my_dashboard():
+    """Return product counts and the current user's buyer and seller counts."""
     return market().my_dashboard(g.actor)
 
 
 @api.get("/my/products/<int:product_id>/reviews")
 @login_required
 def my_product_reviews(product_id):
+    """Return a product's review history subject to owner or admin access."""
     return {"items": market().review_history(g.actor, product_id)}
 
 
 @api.get("/my/products/<int:product_id>/violations")
 @login_required
 def my_product_violations(product_id):
+    """Return a product's violation history subject to owner or admin access."""
     return {"items": market().violation_history(g.actor, product_id)}
 
 
 @api.post("/products")
 @login_required
 def new_product():
+    """Create a draft for the current seller and return HTTP 201."""
     return jsonify(market().create_product(g.actor, body())), 201
 
 
 @api.patch("/products/<int:product_id>")
 @login_required
 def edit_product(product_id):
+    """Apply the seller's requested field changes under the product's state rules."""
     return market().edit_product(g.actor, product_id, body())
 
 
 @api.post("/products/<int:product_id>/submit")
 @login_required
 def submit_product(product_id):
+    """Submit the seller's eligible product for review."""
     return market().submit_product(g.actor, product_id)
 
 
 @api.post("/products/<int:product_id>/delist")
 @login_required
 def delist_product(product_id):
+    """Withdraw the seller's on-sale product and cancel its active reservations."""
     return market().delist_product(g.actor, product_id)
 
 
 @api.post("/admin/products/<int:product_id>/review")
 @login_required
 def admin_review(product_id):
+    """Apply an admin decision and any review reason to a pending product."""
     data = body()
     return market().review_product(g.actor, product_id, data.get("decision"), data.get("reason"))
 
@@ -180,6 +207,7 @@ def admin_review(product_id):
 @api.post("/admin/products/<int:product_id>/violation-delist")
 @login_required
 def violation_delist(product_id):
+    """Delist a product for an admin-supplied violation reason."""
     return market().delist_product(g.actor, product_id, violation=True,
                                    reason=body().get("reason"))
 
@@ -187,6 +215,7 @@ def violation_delist(product_id):
 @api.get("/admin/products/pending")
 @login_required
 def admin_pending_products():
+    """Return the administrator's pending review queue with optional filters."""
     return {"items": market().review_queue(
         g.actor, category=request.args.get("category"),
         keyword=request.args.get("keyword"),
@@ -197,6 +226,7 @@ def admin_pending_products():
 @api.get("/admin/products/reviewed")
 @login_required
 def admin_reviewed_products():
+    """Return paginated products matching the administrator's decision filter."""
     return {"items": market().reviewed_products(
         g.actor, decision=request.args.get("decision"),
         limit=bounded_int_arg("limit", 50, 1),
@@ -206,19 +236,21 @@ def admin_reviewed_products():
 @api.get("/admin/products/workload")
 @login_required
 def admin_review_workload():
+    """Return pending and reviewed counts for the administrator."""
     return market().review_workload(g.actor)
 
 
 @api.get("/admin/products/<int:product_id>")
 @login_required
 def admin_product_detail(product_id):
+    """Return the administrator's detail view of a product in any state."""
     return market().admin_product_detail(g.actor, product_id)
 
 
 @api.get("/admin/products/<int:product_id>/reviews")
 @login_required
 def admin_product_reviews(product_id):
-    from app.services.auth import require_admin
+    """Require an administrator before returning a product's review history."""
     require_admin(g.actor)
     return {"items": market().review_history(g.actor, product_id)}
 
@@ -226,7 +258,7 @@ def admin_product_reviews(product_id):
 @api.get("/admin/products/<int:product_id>/violations")
 @login_required
 def admin_product_violations(product_id):
-    from app.services.auth import require_admin
+    """Require an administrator before returning a product's violation history."""
     require_admin(g.actor)
     return {"items": market().violation_history(g.actor, product_id)}
 
@@ -234,6 +266,7 @@ def admin_product_violations(product_id):
 @api.get("/admin/violations")
 @login_required
 def admin_violation_queue():
+    """Return the administrator's violation queue, defaulting to open cases."""
     return {"items": market().violation_queue(
         g.actor, status=request.args.get("status", "OPEN"),
         limit=bounded_int_arg("limit", 50, 1),
@@ -243,6 +276,7 @@ def admin_violation_queue():
 @api.post("/admin/products/<int:product_id>/violation-resolve")
 @login_required
 def admin_violation_resolve(product_id):
+    """Require a handling note and resolve the product's open violation case."""
     data = guard_fields(body(), permitted={"handling_note"},
                         required={"handling_note"})
     return market().resolve_violation(g.actor, product_id, data["handling_note"])
@@ -251,6 +285,7 @@ def admin_violation_resolve(product_id):
 @api.get("/admin/integrity")
 @login_required
 def admin_integrity_report():
+    """Run read-only integrity checks for an admin with a bounded sample size."""
     return market().integrity_report(
         g.actor, sample_size=bounded_int_arg("sample_size", 20, 1))
 
@@ -258,12 +293,14 @@ def admin_integrity_report():
 @api.get("/admin/integrity/products/<int:product_id>")
 @login_required
 def admin_product_diagnostics(product_id):
+    """Return reservation and state diagnostics for an administrator."""
     return market().product_diagnostics(g.actor, product_id)
 
 
 @api.post("/reservations")
 @login_required
 def reserve():
+    """Submit the buyer's request key and displayed snapshots, returning HTTP 201."""
     data = body()
     return jsonify(market().reserve(
         g.actor, data.get("product_id"), data.get("request_id"),
@@ -273,6 +310,7 @@ def reserve():
 @api.get("/reservations/mine")
 @login_required
 def my_reservations():
+    """List the current buyer's reservations with optional status and pagination."""
     return {"items": market().my_reservations(
         g.actor, status=request.args.get("status"),
         limit=bounded_int_arg("limit", 50, 1),
@@ -282,6 +320,7 @@ def my_reservations():
 @api.get("/reservations/received")
 @login_required
 def received_reservations():
+    """List reservations received for the current seller's products."""
     return {"items": market().received_reservations(
         g.actor, status=request.args.get("status"),
         limit=bounded_int_arg("limit", 50, 1),
@@ -291,42 +330,49 @@ def received_reservations():
 @api.get("/reservations/<int:reservation_id>")
 @login_required
 def reservation_detail(reservation_id):
+    """Return a reservation visible to its buyer or the product's seller."""
     return market().private_reservation(g.actor, reservation_id)
 
 
 @api.post("/reservations/<int:reservation_id>/confirm")
 @login_required
 def confirm(reservation_id):
+    """Confirm an eligible reservation as the seller."""
     return market().confirm_reservation(g.actor, reservation_id)
 
 
 @api.post("/reservations/<int:reservation_id>/reject")
 @login_required
 def reject(reservation_id):
+    """Reject an eligible reservation as the seller and record the submitted reason."""
     return market().reject_reservation(g.actor, reservation_id, body().get("reason"))
 
 
 @api.post("/reservations/<int:reservation_id>/cancel")
 @login_required
 def cancel(reservation_id):
+    """Cancel the authenticated buyer's active reservation."""
     return market().cancel_reservation(g.actor, reservation_id)
 
 
 @api.post("/reservations/<int:reservation_id>/complete")
 @login_required
 def complete(reservation_id):
+    """Complete an eligible reservation as the seller and mark the product sold."""
     return market().complete_reservation(g.actor, reservation_id)
 
 
 @api.get("/stats/seller")
 @login_required
 def seller_stats():
+    """Return the current seller's inventory and completed transaction counts."""
     return market().seller_stats(g.actor)
 
 
 @api.get("/admin/products/<int:product_id>/timeline")
 @login_required
 def admin_product_timeline(product_id):
+    """Page through audit events for a product and its reservations as an admin."""
     return {"items": market().admin_product_timeline(
         g.actor, product_id, limit=bounded_int_arg("limit", 50, 1),
         offset=bounded_int_arg("offset", 0))}
@@ -335,6 +381,7 @@ def admin_product_timeline(product_id):
 @api.get("/admin/activity/summary")
 @login_required
 def admin_activity_summary():
+    """Summarize audit activity within the admin's requested date range."""
     return market().admin_activity_summary(
         g.actor, start=request.args.get("start"), end=request.args.get("end"),
         limit=bounded_int_arg("limit", 20, 1))
@@ -343,6 +390,7 @@ def admin_activity_summary():
 @api.get("/admin/users/<int:user_id>/activity")
 @login_required
 def admin_user_activity(user_id):
+    """Return a user's account details and paginated audit activity for an admin."""
     return market().admin_user_activity(
         g.actor, user_id, limit=bounded_int_arg("limit", 50, 1),
         offset=bounded_int_arg("offset", 0))
@@ -351,12 +399,14 @@ def admin_user_activity(user_id):
 @api.get("/admin/stats")
 @login_required
 def admin_stats():
+    """Return platform publication and sales statistics for the selected dates."""
     return market().admin_stats(g.actor, request.args.get("start"), request.args.get("end"))
 
 
 @api.get("/admin/logs")
 @login_required
 def logs():
+    """Return admin audit records matching the requested filters and page."""
     return {"items": market().admin_logs(
         g.actor, limit=bounded_int_arg("limit", 50, 1),
         offset=bounded_int_arg("offset", 0),
@@ -369,14 +419,17 @@ def logs():
 
 
 def register_routes(app) -> None:
+    """Attach the API blueprint and map business and database errors to JSON."""
     app.register_blueprint(api)
 
     @app.errorhandler(BusinessError)
     def business_error(err: BusinessError):
+        """Return the business error's public code, message, and HTTP status."""
         return {"error": {"code": err.code, "message": err.message}}, err.status
 
     @app.errorhandler(sqlite3.OperationalError)
     def database_unavailable(err: sqlite3.OperationalError):
+        """Map SQLite lock errors to 503 and log unexpected failures before a 500."""
         if "locked" in str(err).lower():
             return {"error": {"code": "DB_BUSY", "message": "数据库繁忙，请重试"}}, 503
         current_app.logger.exception("Unexpected database error")

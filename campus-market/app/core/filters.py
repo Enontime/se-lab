@@ -12,6 +12,7 @@ from app.core.validation import integer, string
 
 
 def iso_day(value: str, field: str) -> str:
+    """Trim and validate a calendar date in canonical YYYY-MM-DD form."""
     value = string(value, field, limit=10)
     try:
         parsed = date.fromisoformat(value)
@@ -37,6 +38,7 @@ def like_contains(value: str, field: str, *, limit: int = 100) -> str:
 
 
 def pagination(limit: int = 50, offset: int = 0, *, cap: int = 100) -> tuple[int, int]:
+    """Validate a positive limit within the cap and a nonnegative offset."""
     limit = integer(limit, "limit", 1)
     offset = integer(offset, "offset", 0)
     require(limit <= cap, "INVALID_INPUT", f"limit 不能大于 {cap}")

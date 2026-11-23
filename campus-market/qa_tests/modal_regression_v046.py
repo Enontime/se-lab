@@ -16,7 +16,7 @@ import sys
 from pathlib import Path
 from urllib.parse import urlparse
 
-from playwright.sync_api import sync_playwright, expect
+from playwright.sync_api import expect, sync_playwright
 
 
 def run():

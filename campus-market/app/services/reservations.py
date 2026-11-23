@@ -1,7 +1,7 @@
 """M4: reservation lifecycle with transaction-level product coordination."""
 from __future__ import annotations
 
-from app.core.errors import BusinessError, require
+from app.core.errors import require
 from app.core.state_rules import check_reservation_edge
 from app.core.validation import detail_from_row, fingerprint, integer, now, string
 from app.services.audit import log_success
@@ -10,11 +10,13 @@ from app.services.products import active_booking, product_row
 
 
 def booking_row(conn, reservation_id: int) -> dict:
+    """Fetch a reservation by ID or raise NOT_FOUND; callers enforce access."""
     return detail_from_row(conn.execute(
         "SELECT * FROM reservations WHERE id=?", (reservation_id,)).fetchone())
 
 
 def _idempotent(conn, actor_id: int, request_id: str, expected_fp: str) -> dict | None:
+    """Return an exact replay for this buyer and request key, or reject key reuse."""
     row = conn.execute(
         "SELECT * FROM reservations WHERE buyer_id=? AND request_id=?",
         (actor_id, request_id),
@@ -60,6 +62,7 @@ def create(conn, actor: dict, product_id: int, request_id: str,
 
 
 def _seller_booking(conn, actor: dict, reservation_id: int) -> tuple[dict, dict]:
+    """Return the booking and product when the normal actor owns the product."""
     require_normal(actor)
     booking = booking_row(conn, reservation_id)
     product = product_row(conn, booking["product_id"])
@@ -69,6 +72,7 @@ def _seller_booking(conn, actor: dict, reservation_id: int) -> tuple[dict, dict]
 
 
 def confirm(conn, actor: dict, reservation_id: int) -> dict:
+    """Confirm and audit the seller's pending on-sale booking in the caller's transaction."""
     b, p = _seller_booking(conn, actor, reservation_id)
     require(b["status"] == "PENDING" and p["status"] == "ON_SALE",
             "INVALID_STATUS", "只有在售商品的待确认预约可以确认", 409)
@@ -80,6 +84,7 @@ def confirm(conn, actor: dict, reservation_id: int) -> dict:
 
 
 def reject(conn, actor: dict, reservation_id: int, reason: str) -> dict:
+    """Cancel and audit the seller's pending on-sale booking with the supplied reason."""
     b, p = _seller_booking(conn, actor, reservation_id)
     require(b["status"] == "PENDING" and p["status"] == "ON_SALE",
             "INVALID_STATUS", "只有待确认的在售预约可以拒绝", 409)
@@ -95,6 +100,7 @@ def reject(conn, actor: dict, reservation_id: int, reason: str) -> dict:
 
 
 def cancel(conn, actor: dict, reservation_id: int) -> dict:
+    """Cancel and audit the buyer's pending or confirmed booking."""
     require_normal(actor)
     b = booking_row(conn, reservation_id)
     require(b["buyer_id"] == actor["id"], "FORBIDDEN", "只能取消自己的预约", 403)

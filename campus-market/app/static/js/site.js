@@ -1,5 +1,4 @@
-/* 校园拾集 v0.4.4: 11 screens mapped to UI-01..UI-11, backed by the real Flask API.
-   This file is presentation code and is excluded from the 1500-line backend target. */
+/* Campus Market UI-01 through UI-11, backed by the Flask API. */
 (() => {
   "use strict";
 

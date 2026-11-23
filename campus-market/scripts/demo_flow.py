@@ -1,8 +1,8 @@
-"""A full in-memory-demo-like flow on a temporary on-disk SQLite database."""
+"""Run the full transaction demo on a temporary on-disk SQLite database."""
 from __future__ import annotations
 
-from tempfile import TemporaryDirectory
 from pathlib import Path
+from tempfile import TemporaryDirectory
 
 from app.services.market import Market
 

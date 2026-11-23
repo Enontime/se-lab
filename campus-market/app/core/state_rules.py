@@ -53,26 +53,32 @@ def check_reservation_edge(before: str, after: str) -> None:
 
 
 def valid_product_edge(before: str, after: str) -> bool:
+    """Return whether the product graph permits the transition."""
     return after in PRODUCT_GRAPH.get(before, ())
 
 
 def valid_reservation_edge(before: str, after: str) -> bool:
+    """Return whether the reservation graph permits the transition."""
     return after in RESERVATION_GRAPH.get(before, ())
 
 
 def can_book(product_status: str, active_booking: bool) -> bool:
+    """Check whether an on-sale product has room for an active booking."""
     return product_status == "ON_SALE" and not active_booking
 
 
 def can_complete(product_status: str, reservation_status: str) -> bool:
+    """Check whether a confirmed reservation still has an on-sale product."""
     return product_status == "ON_SALE" and reservation_status == "CONFIRMED"
 
 
 def can_cancel(reservation_status: str) -> bool:
+    """Check whether the reservation is still pending or confirmed."""
     return reservation_status in ACTIVE_RESERVATIONS
 
 
 def can_resubmit(product_status: str, *, violation_resolved: bool = False) -> bool:
+    """Check submission eligibility by status and any required violation resolution."""
     if product_status == "VIOLATION_DELISTED":
         return violation_resolved
     return product_status in {"DRAFT", "REJECTED", "DELISTED"}

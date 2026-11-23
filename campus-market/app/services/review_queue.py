@@ -2,8 +2,8 @@
 from __future__ import annotations
 
 from app.core.errors import require
-from app.core.validation import detail_from_row, integer, string
 from app.core.filters import like_contains
+from app.core.validation import detail_from_row, integer, string
 from app.db.read_models import page_bounds
 from app.services.auth import require_admin
 

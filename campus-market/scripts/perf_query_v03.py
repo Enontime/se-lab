@@ -24,8 +24,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from urllib.request import urlopen
 
-from app.services.market import Market
 from app.db.connection import write_transaction
+from app.services.market import Market
 
 
 def seed(market: Market, items: int) -> None:

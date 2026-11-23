@@ -2,9 +2,9 @@
 from __future__ import annotations
 
 import sqlite3
+from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
-from collections.abc import Iterator
 
 from app.db.migrations import backfill_open_violation_cases, ensure_reservation_snapshot_columns
 
@@ -12,6 +12,7 @@ SCHEMA_PATH = Path(__file__).with_name("schema.sql")
 
 
 def connect(db_path: str | Path) -> sqlite3.Connection:
+    """Open an autocommit SQLite connection with named rows and foreign keys enabled."""
     conn = sqlite3.connect(str(db_path), timeout=5.0, isolation_level=None)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys=ON")
@@ -20,6 +21,7 @@ def connect(db_path: str | Path) -> sqlite3.Connection:
 
 
 def initialize(db_path: str | Path) -> None:
+    """Apply the schema and run the migrations in a write transaction."""
     path = Path(db_path)
     path.parent.mkdir(parents=True, exist_ok=True)
     conn = connect(path)
@@ -32,14 +34,14 @@ def initialize(db_path: str | Path) -> None:
         except BaseException:
             conn.rollback()
             raise
-        else:
-            conn.commit()
+        conn.commit()
     finally:
         conn.close()
 
 
 @contextmanager
 def read_connection(db_path: str | Path) -> Iterator[sqlite3.Connection]:
+    """Yield an autocommit connection for queries and close it on exit."""
     conn = connect(db_path)
     try:
         yield conn
@@ -62,7 +64,6 @@ def write_transaction(db_path: str | Path) -> Iterator[sqlite3.Connection]:
         except BaseException:
             conn.rollback()
             raise
-        else:
-            conn.commit()
+        conn.commit()
     finally:
         conn.close()

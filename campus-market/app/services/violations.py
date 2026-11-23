@@ -7,6 +7,7 @@ from __future__ import annotations
 
 from app.core.errors import require
 from app.core.validation import detail_from_row, integer, now, string
+from app.db.read_models import page_bounds
 from app.services import audit
 from app.services.auth import require_admin
 from app.services.products import product_row
@@ -30,6 +31,7 @@ def open_case(conn, actor: dict, product_id: int, reason: str) -> dict:
 
 
 def case_detail(conn, case_id: int) -> dict:
+    """Return a case with current product details or raise NOT_FOUND."""
     case_id = integer(case_id, "case_id")
     return detail_from_row(conn.execute("""SELECT c.*,p.status AS product_status,
         p.title AS product_title FROM violation_cases c
@@ -38,12 +40,14 @@ def case_detail(conn, case_id: int) -> dict:
 
 
 def current_case(conn, product_id: int) -> dict | None:
+    """Return the most recently created case for a product, if any."""
     row = conn.execute("""SELECT * FROM violation_cases
         WHERE product_id=? ORDER BY id DESC LIMIT 1""", (product_id,)).fetchone()
     return dict(row) if row else None
 
 
 def is_resolved(conn, product_id: int) -> bool:
+    """Return whether the product's most recent case has a resolution timestamp."""
     case = current_case(conn, product_id)
     return bool(case and case["resolved_at"] is not None)
 
@@ -68,6 +72,7 @@ def resolve(conn, actor: dict, product_id: int, note: str) -> dict:
 
 
 def ready_for_resubmit(conn, product_id: int) -> None:
+    """Reject resubmission when the latest violation case has no resolution."""
     require(is_resolved(conn, product_id), "INVALID_STATUS",
             "违规下架商品须先由管理员处理，才能重新提交审核", 409)
 
@@ -75,8 +80,6 @@ def ready_for_resubmit(conn, product_id: int) -> None:
 def list_cases(conn, actor: dict, *, status: str = "OPEN",
                limit: int = 50, offset: int = 0) -> list[dict]:
     """Admin worklist; admins can also inspect resolved cases for auditing."""
-    from app.db.read_models import page_bounds
-
     require_admin(actor)
     limit, offset = page_bounds(limit, offset)
     require(status in {"OPEN", "RESOLVED", "ALL"},

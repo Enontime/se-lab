@@ -25,6 +25,7 @@ def page_bounds(limit: int = 50, offset: int = 0) -> tuple[int, int]:
 
 
 def optional_status(value: str | None, options: set[str], field: str) -> str | None:
+    """Validate a supplied status against the allowed options or preserve None."""
     if value is None:
         return None
     value = string(value, field, limit=40)
@@ -34,6 +35,7 @@ def optional_status(value: str | None, options: set[str], field: str) -> str | N
 
 def owned_products(conn, actor: dict, *, status: str | None = None,
                    limit: int = 50, offset: int = 0) -> list[dict]:
+    """Page through a normal seller's own products with active-booking flags."""
     require_normal(actor)
     limit, offset = page_bounds(limit, offset)
     status = optional_status(status, PRODUCT_STATUSES, "status")
@@ -88,12 +90,14 @@ def _reservations(conn, actor: dict, *, seller_side: bool,
 
 def buyer_reservations(conn, actor: dict, *, status: str | None = None,
                        limit: int = 50, offset: int = 0) -> list[dict]:
+    """Page through a normal buyer's reservations with seller names."""
     return _reservations(conn, actor, seller_side=False, status=status,
                          limit=limit, offset=offset)
 
 
 def seller_reservations(conn, actor: dict, *, status: str | None = None,
                         limit: int = 50, offset: int = 0) -> list[dict]:
+    """Page through a normal seller's received reservations with buyer names."""
     return _reservations(conn, actor, seller_side=True, status=status,
                          limit=limit, offset=offset)
 

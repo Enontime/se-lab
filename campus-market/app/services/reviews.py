@@ -10,6 +10,11 @@ from app.services.products import product_row
 
 
 def review(conn, actor: dict, product_id: int, decision: str, reason: str | None) -> dict:
+    """Decide a pending review, update the product, and append an audit entry.
+
+    The caller supplies the write transaction. The actor must be an admin,
+    and a rejection requires a reason.
+    """
     require_admin(actor)
     require(decision in {"APPROVED", "REJECTED"}, "INVALID_DECISION",
             "审核决定必须为 APPROVED 或 REJECTED")

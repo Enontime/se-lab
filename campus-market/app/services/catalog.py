@@ -11,6 +11,7 @@ def visible_products(conn, *, keyword: str | None = None, category: str | None =
                      min_price: int | None = None, max_price: int | None = None,
                      availability: str | None = None, status: str | None = None,
                      limit: int = 50, offset: int = 0) -> list[dict]:
+    """Page through on-sale products by search, price, category, and derived availability."""
     limit = integer(limit, "limit")
     offset = integer(offset, "offset", 0)
     require(limit <= 100, "INVALID_INPUT", "limit 不能大于 100")
@@ -50,6 +51,7 @@ def visible_products(conn, *, keyword: str | None = None, category: str | None =
 
 
 def seller_statistics(conn, actor: dict) -> dict:
+    """Count a normal seller's products by state and completed transactions."""
     require_normal(actor)
     rows = conn.execute(
         "SELECT status,COUNT(*) AS n FROM products WHERE seller_id=? GROUP BY status",
@@ -66,6 +68,7 @@ def seller_statistics(conn, actor: dict) -> dict:
 
 def platform_statistics(conn, actor: dict, start: str | None = None,
                         end: str | None = None) -> dict:
+    """Count platform publications and completed sales by day and category for admins."""
     require_admin(actor)
     start, end = date_range(start, end)
     where_pub = ["published_at IS NOT NULL"]
@@ -83,13 +86,19 @@ def platform_statistics(conn, actor: dict, start: str | None = None,
         where_done.append("substr(r.completed_at,1,10)<=?")
         pubargs.append(end)
         doneargs.append(end)
-    pubsql = "SELECT substr(published_at,1,10) day,category,COUNT(*) n FROM products WHERE " + " AND ".join(where_pub) + " GROUP BY day,category ORDER BY day,category"
-    donesql = """SELECT substr(r.completed_at,1,10) day,p.category,COUNT(*) n
-                 FROM reservations r JOIN products p ON r.product_id=p.id WHERE """ + " AND ".join(where_done) + " GROUP BY day,p.category ORDER BY day,p.category"
+    pubsql = (
+        "SELECT substr(published_at,1,10) day,category,COUNT(*) n FROM products WHERE "
+        + " AND ".join(where_pub)
+        + " GROUP BY day,category ORDER BY day,category"
+    )
+    donesql = (
+        "SELECT substr(r.completed_at,1,10) day,p.category,COUNT(*) n\n"
+        "                 FROM reservations r JOIN products p ON r.product_id=p.id WHERE "
+        + " AND ".join(where_done)
+        + " GROUP BY day,p.category ORDER BY day,p.category"
+    )
     return {"published": [dict(r) for r in conn.execute(pubsql, pubargs)],
             "completed": [dict(r) for r in conn.execute(donesql, doneargs)]}
-
-
 
 
 def public_facets(conn) -> dict:

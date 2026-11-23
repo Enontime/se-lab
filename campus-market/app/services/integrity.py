@@ -6,9 +6,11 @@ versions. Checking does not repair or modify records silently.
 """
 from __future__ import annotations
 
-from app.services.auth import require_admin
+from app.core.errors import require
+from app.core.validation import fingerprint, integer
 from app.db.migrations import migration_status
-from app.core.validation import fingerprint
+from app.services.auth import require_admin
+from app.services.products import product_row
 
 CHECKS = (
     (
@@ -79,9 +81,6 @@ CHECKS = (
 
 def run_checks(conn, actor: dict, *, sample_size: int = 20) -> dict:
     """Return totals and bounded IDs; no private data is returned to non-admins."""
-    from app.core.validation import integer
-    from app.core.errors import require
-
     require_admin(actor)
     sample_size = integer(sample_size, "sample_size", 1)
     require(sample_size <= 100, "INVALID_INPUT", "sample_size 不能超过 100")
@@ -109,9 +108,6 @@ def run_checks(conn, actor: dict, *, sample_size: int = 20) -> dict:
 
 def quick_product_check(conn, product_id: int) -> dict:
     """Domain-relevant detail for diagnosing a specific product safely in CLI."""
-    from app.core.validation import integer
-    from app.services.products import product_row
-
     product_id = integer(product_id, "product_id")
     p = product_row(conn, product_id)
     counts = {row["status"]: row["n"] for row in conn.execute(

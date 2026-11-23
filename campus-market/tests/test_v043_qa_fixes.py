@@ -1,6 +1,8 @@
 """v0.4.3 QA fixes: capacity, private review tabs, log actor lookup and UI traceability."""
 from pathlib import Path
+
 import pytest
+
 from app.core.errors import BusinessError
 
 
